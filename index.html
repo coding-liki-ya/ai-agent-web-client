@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat Client</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>AI Chat Client</header>
+        <nav>
+            <button onclick="window.open('logtab.html', '_blank')">Лог вызовов функций</button>
+        </nav>
+        <div id="chat"></div>
+        <form id="inputForm">
+            <div id="commandButtons" style="margin: 10px 0;"></div>
+            <textarea id="messageInput" placeholder="Введите сообщение" autocomplete="off" rows="4"></textarea>
+            <button id="sendBtn">Отправить</button>
+        </form>
+    </div>
+    <script src="client.js"></script>
+</body>
+</html>

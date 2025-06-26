@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Лог вызовов функций</title>
+<style>
+body { font-family: Arial, sans-serif; background: #f4f7fa; color: #333; margin: 0; padding: 20px; }
+.log-entry { margin-bottom: 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); overflow: hidden; }
+.log-header { padding: 8px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: bold; user-select: none; }
+.log-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.3s ease; padding: 0 12px; font-family: monospace; background: #fafafa; }
+.log-content.open { max-height: 10000px; padding: 8px 12px; }
+.field-block { border: 1px solid #ccc; border-radius: 4px; margin: 4px 0; }
+.field-header { padding: 4px 8px; cursor: pointer; background: #eee; font-weight: 600; user-select: none; display: flex; justify-content: space-between; align-items: center; }
+.field-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.3s ease; padding: 0 8px; white-space: pre-wrap; background: #f9f9f9; font-family: monospace; }
+.field-content.open { max-height: 10000px; padding: 4px 8px; }
+
+.log-entry.request { background-color: #dff0d8; color: #3c763d; }
+.log-entry.request .log-header { justify-content: flex-end; }
+.log-entry.response { background-color: #f2dede; color: #a94442; }
+.log-entry.response .log-header { justify-content: flex-start; }
+
+button#clear-logs { margin-bottom: 15px; padding: 8px 16px; font-size: 16px; cursor: pointer; }
+
+</style>
+</head>
+<body>
+<h1>Лог вызовов функций</h1>
+<button id="clear-logs">Очистить логи</button>
+<div id="logContainer"></div>
+<script>
+function toggleClass(el, className) {
+  if (el.classList.contains(className)) {
+    el.classList.remove(className);
+  } else {
+    el.classList.add(className);
+  }
+}
+
+function createFieldBlock(key, value) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'field-block';
+  const header = document.createElement('div');
+  header.className = 'field-header';
+  header.textContent = key;
+  wrapper.appendChild(header);
+
+  const content = document.createElement('div');
+  content.className = 'field-content';
+
+  if (value === null) {
+    content.textContent = 'null';
+  } else if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      content.appendChild(createFieldBlock(`[${index}]`, item));
+    });
+  } else if (typeof value === 'object') {
+    for (const k in value) {
+      if (Object.hasOwnProperty.call(value, k)) {
+        content.appendChild(createFieldBlock(k, value[k]));
+      }
+    }
+  } else {
+    content.textContent = value;
+  }
+
+  wrapper.appendChild(content);
+
+  header.addEventListener('click', () => {
+    toggleClass(content, 'open');
+  });
+
+  return wrapper;
+}
+
+function hashCode(str) {
+  let hash = 0, i, chr;
+  if (str.length === 0) return hash;
+  for (i = 0; i < str.length; i++) {
+    chr = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + chr;
+    hash |= 0; // Convert to 32bit integer
+  }
+  return hash.toString();
+}
+
+function createLogEntry(entry) {
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+
+  const entryStr = JSON.stringify(entry);
+  const entryHash = hashCode(entryStr);
+  div.dataset.hash = entryHash;
+
+  let isRequest = false;
+  let isResponse = false;
+  let toolName = '';
+  let datetimeStr = '';
+
+  if (entry.tool) {
+    toolName = entry.tool;
+  }
+
+  if (entry.timestamp) {
+    datetimeStr = entry.timestamp;
+  } else if (entry.time) {
+    datetimeStr = entry.time;
+  }
+
+  if (entry.request) {
+    isRequest = true;
+    div.classList.add('request');
+  } else if (entry.response) {
+    isResponse = true;
+    div.classList.add('response');
+  } else if (entry.requestSummary){
+    if (entry.requestSummary.toLowerCase().includes('request')) {
+      isRequest = true;
+      div.classList.add('request');
+    }
+    if (entry.requestSummary.toLowerCase().includes('response')) {
+      isResponse = true;
+      div.classList.add('response');
+    }
+  }
+
+  const header = document.createElement('div');
+  header.className = 'log-header';
+  header.textContent = toolName + (datetimeStr ? ' | ' + datetimeStr : '');
+  div.appendChild(header);
+
+  const content = document.createElement('div');
+  content.className = 'log-content';
+
+  let dataForDisplay = null;
+  if (isRequest) dataForDisplay = entry.request;
+  else if (isResponse) dataForDisplay = entry.response;
+  else dataForDisplay = entry;
+
+  if (typeof dataForDisplay !== 'object') {
+    content.textContent = JSON.stringify(dataForDisplay, null, 2);
+  } else {
+    for (const key in dataForDisplay) {
+      if (Object.hasOwnProperty.call(dataForDisplay, key)) {
+        const fieldBlock = createFieldBlock(key, dataForDisplay[key]);
+        content.appendChild(fieldBlock);
+      }
+    }
+  }
+
+  div.appendChild(content);
+
+  header.addEventListener('click', () => {
+    toggleClass(content, 'open');
+  });
+
+  return div;
+}
+
+const ws = new WebSocket('ws://' + location.hostname + ':8089');
+const logContainer = document.getElementById('logContainer');
+const clearLogsBtn = document.getElementById('clear-logs');
+
+let firstMessageSkipped = false;
+let lastReceivedHashes = new Set();
+
+function updateLogs(logEntries) {
+  const existingHashes = new Set();
+  const elementsToKeep = [];
+
+  logEntries.forEach(entry => {
+    const entryStr = JSON.stringify(entry);
+    const entryHash = hashCode(entryStr);
+    existingHashes.add(entryHash);
+
+    let existingEl = [...logContainer.children].find(el => el.dataset.hash === entryHash);
+    if (existingEl) {
+      elementsToKeep.push(existingEl);
+    } else {
+      const newEntryEl = createLogEntry(entry);
+      // Вставляем сверху вместо append
+      logContainer.insertBefore(newEntryEl, logContainer.firstChild);
+      elementsToKeep.push(newEntryEl);
+    }
+  });
+
+  [...logContainer.children].forEach(el => {
+    if (!existingHashes.has(el.dataset.hash)) {
+      logContainer.removeChild(el);
+    }
+  });
+
+  lastReceivedHashes = existingHashes;
+}
+
+ws.onopen = () => {
+  ws.send('/function_call_log');
+};
+
+ws.onmessage = e => {
+  if (!firstMessageSkipped) {
+    firstMessageSkipped = true;
+    return;
+  }
+
+  try {
+    const data = JSON.parse(e.data);
+    if (data.reply) {
+      const logsStrings = data.reply.split('\n').filter(s => s.trim() !== '');
+      const logEntries = [];
+      logsStrings.forEach(logStr => {
+        try {
+          const entry = JSON.parse(logStr);
+          logEntries.push(entry);
+        } catch (err) {
+          console.error('Error parsing individual log entry', err, logStr);
+        }
+      });
+      updateLogs(logEntries);
+    }
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+clearLogsBtn.onclick = () => {
+  ws.send('/clear_function_logs');
+};
+
+// Ежесекундное обновление логов
+setInterval(() => {
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send('/function_call_log');
+  }
+}, 1000);
+
+</script>
+</body>
+</html>

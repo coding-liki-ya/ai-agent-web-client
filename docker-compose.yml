@@ -1,0 +1,21 @@
+version: '3.8'
+services:
+  websocket-backend:
+    build: .
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./:/app
+    network_mode: "host"
+    restart: unless-stopped
+
+  frontend:
+    image: nginx:alpine
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html:ro
+      - ./style.css:/usr/share/nginx/html/style.css:ro
+      - ./client.js:/usr/share/nginx/html/client.js:ro
+      - ./logtab.html:/usr/share/nginx/html/logtab.html:ro
+    ports:
+      - "8088:80"
+    restart: unless-stopped

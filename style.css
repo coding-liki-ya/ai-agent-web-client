@@ -1,0 +1,136 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f5f8fa;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+body {
+    height: 100%;
+    margin: 0;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    width: 95%;
+    max-width: 1200px; /* Увеличена максимальная ширина для больших экранов */
+    height: 100%;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background-color: white;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+header {
+    padding: 15px 20px;
+    background-color: #007bff;
+    color: white;
+    font-size: 1.25em;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+#chat {
+    flex-grow: 1;
+    padding: 15px 20px;
+    overflow-y: auto;
+    border-bottom: 1px solid #ddd;
+    background-color: #fefefe;
+    display: flex;
+    flex-direction: column;
+}
+
+.assistant-message {
+    white-space: pre-wrap;
+    margin-bottom: 15px;
+    background-color: #d1ecf1; /* Светло-голубой фон для ассистента */
+    padding: 10px 15px;
+    border-radius: 15px;
+    max-width: 80%;
+    color: #0c5460; /* Тёмно-синий цвет текста */
+    align-self: flex-start; /* Выравнивание слева */
+}
+
+.user-message {
+    white-space: pre-wrap;
+    margin-bottom: 15px;
+    background-color: #007bff;
+    padding: 10px 15px;
+    border-radius: 15px;
+    max-width: 80%;
+    color: white;
+    align-self: flex-end; /* Выравнивание справа */
+}
+
+#inputForm {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 15px;
+    background-color: #f1f3f5;
+}
+
+#commandButtons {
+    margin-bottom: 10px;
+}
+
+#messageInput {
+    border: 1px solid #ddd;
+    border-radius: 15px;
+    padding: 10px 15px;
+    font-size: 1em;
+    resize: none;
+    outline: none;
+    color: #333;
+    background-color: white;
+    height: 80px;
+    margin-bottom: 10px;
+}
+
+#sendBtn {
+    padding: 10px 20px;
+    border: none;
+    background-color: #007bff;
+    color: white;
+    border-radius: 15px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    align-self: flex-end;
+}
+
+#sendBtn:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+}
+
+#sendBtn:hover:not(:disabled) {
+    background-color: #0056b3;
+}
+
+@media (max-width: 600px) {
+    .container {
+        height: 100%;
+        border-radius: 0;
+        max-width: 100%;
+    }
+    #chat {
+        padding: 10px;
+    }
+    #inputForm {
+        padding: 8px 10px;
+    }
+    #messageInput {
+        font-size: 0.9em;
+        height: 60px;
+    }
+    #sendBtn {
+        font-size: 0.9em;
+        padding: 8px 15px;
+    }
+}
