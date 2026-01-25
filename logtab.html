@@ -156,7 +156,8 @@ function createLogEntry(entry) {
   return div;
 }
 
-const ws = new WebSocket('ws://' + location.hostname + ':8089');
+const token = localStorage.getItem('jwt');
+const ws = new WebSocket(`ws://${location.hostname}:8090/?token=${token}`);
 const logContainer = document.getElementById('logContainer');
 const clearLogsBtn = document.getElementById('clear-logs');
 

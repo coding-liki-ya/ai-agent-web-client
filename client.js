@@ -1,47 +1,98 @@
-const ws = new WebSocket('ws://' + location.hostname + ':8089');
-
 const chat = document.getElementById('chat');
 const input = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendBtn');
 const commandButtons = document.getElementById('commandButtons');
 const inputForm = document.getElementById('inputForm');
 
-ws.onmessage = function(event) {
-  try {
-    const data = JSON.parse(event.data);
-    if (data.reply) {
-      appendMessage('assistant', data.reply);
-      chat.scrollTop = chat.scrollHeight;
-      // При получении ответа на /reset перезагрузить страницу
-      if (input.value.trim().startsWith('/reset')) {
-        location.reload();
-      }
+async function checkUser() {
+  const res = await fetch('/login-check');
+  return res.status === 200;
+}
+
+function showRegistrationForm() {
+  document.getElementById('form-title').textContent = 'Register';
+  document.getElementById('auth-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const login = document.getElementById('login').value;
+    const password = document.getElementById('password').value;
+    const res = await fetch('/register', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({login, password})
+    });
+    if (res.ok) {
+      alert('Registered successfully');
+      showLoginForm();
+    } else {
+      alert('Registration failed');
     }
-  } catch(e) {
-    console.error('Invalid JSON:', event.data);
-  }
-};
-
-sendBtn.onclick = function() {
-  if(input.value.trim() !== '') {
-    appendMessage('user', input.value.trim());
-    ws.send(input.value.trim());
-    input.value = '';
-  }
-};
-
-input.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
+  };
+  document.getElementById('auth-section').style.display = 'block';
+}
+let ws ;
+function showLoginForm() {
+  document.getElementById('form-title').textContent = 'Login';
+  document.getElementById('auth-form').onsubmit = async (e) => {
     e.preventDefault();
-    sendBtn.onclick();
-  }
-});
+    const login = document.getElementById('login').value;
+    const password = document.getElementById('password').value;
+    const res = await fetch('/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({login, password})
+    });
+    if (res.ok) {
+      const data = await res.json();
+      localStorage.setItem('jwt', data.token);
+      alert('Login successful');
+      document.getElementById('auth-section').style.display = 'none';
+      ws = connectWebSocket(data.token);
+    } else {
+      alert('Login failed');
+    }
+  };
+  document.getElementById('auth-section').style.display = 'block';
+}
 
-inputForm.addEventListener('submit', async e => {
-    e.preventDefault();
-});
+function connectWebSocket(token) {
+  let ws = new WebSocket(`ws://${location.hostname}:8090/?token=${token}`);
+  ws.onopen = () => {
+    console.log('WebSocket connected');
+    ws.send('/history');
+  };
 
-var commands = [
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.reply) {
+        try {
+          const history = JSON.parse(data.reply);
+          history.forEach(item => {
+            appendMessage(item.role, item.text);
+          });
+        } catch (e) {
+          appendMessage('assistant', data.reply);
+        }
+        chat.scrollTop = chat.scrollHeight;
+
+        // Перезагрузка страницы при ответе на /reset
+        if (lastUserCommand && lastUserCommand === '/reset') {
+          location.reload();
+        }
+      }
+    } catch(e) {
+      console.error('Invalid JSON:', event.data);
+    }
+  };
+
+  ws.onclose = () => {
+    console.log('WebSocket closed');
+  };
+
+  return ws;
+}
+
+const commands = [
   { cmd: '/plan', desc: 'создать план для цели' },
   { cmd: '/run', desc: 'запустить план по id или текущий' },
   { cmd: '/step', desc: 'выполнить следующий шаг текущего плана' },
@@ -98,36 +149,18 @@ function appendMessage(role, text) {
   chat.appendChild(div);
 }
 
-window.addEventListener('load', function() {
+window.addEventListener('load', async function() {
   createButtons();
-  ws.onopen = function() {
-    ws.send('/history');
-  };
-  ws.onmessage = function(event) {
-    try {
-      const data = JSON.parse(event.data);
-      if (data.reply) {
-        try {
-          const history = JSON.parse(data.reply);
-          history.forEach(item => {
-            appendMessage(item.role, item.text);
-          });
-        } catch (e) {
-          appendMessage('assistant', data.reply);
-        }
-        chat.scrollTop = chat.scrollHeight;
-
-        // Перезагрузка страницы при ответе на /reset
-        if (lastUserCommand && lastUserCommand.startsWith('/reset')) {
-          location.reload();
-        }
-
-      }
-    } catch(e) {
-      console.error('Invalid JSON:', event.data);
+  const token = localStorage.getItem('jwt');
+  if(token){
+    ws = connectWebSocket(token)
+  } else {
+    if (await checkUser()) {
+      showLoginForm();
+    } else {
+      showRegistrationForm();
     }
-  };
-  loadHistory();
+  }
 });
 
 let lastUserCommand = null;
@@ -136,7 +169,15 @@ sendBtn.onclick = function() {
   if(input.value.trim() !== '') {
     lastUserCommand = input.value.trim();
     appendMessage('user', lastUserCommand);
-    ws.send(lastUserCommand);
+    const token = localStorage.getItem('jwt');
+    if(!token){
+      alert('Please login first');
+      return;
+    }
+    if (!ws) {
+      ws = connectWebSocket(token);
+    }
+    ws.send(input.value.trim());
     input.value = '';
   }
 };

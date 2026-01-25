@@ -18,6 +18,14 @@
             <textarea id="messageInput" placeholder="Введите сообщение" autocomplete="off" rows="4"></textarea>
             <button id="sendBtn">Отправить</button>
         </form>
+        <div id="auth-section" style="display:none; margin-top:20px;">
+            <h2 id="form-title"></h2>
+            <form id="auth-form">
+                <input type="text" id="login" name="login" placeholder="Введите логин" required>
+                <input type="password" id="password" name="password" placeholder="Введите пароль" required>
+                <button type="submit" id="submit-btn">Отправить</button>
+            </form>
+        </div>
     </div>
     <script src="client.js"></script>
 </body>
